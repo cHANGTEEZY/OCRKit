@@ -1,7 +1,9 @@
 import Tesseract from "tesseract.js";
 import type { OCRResult } from "../types/ocr.type.js";
 
-export const extractTextFromImage= async (image: string) : Promise<OCRResult> => {
+export const extractTextFromImage = async (
+  image: string | Buffer,
+): Promise<OCRResult> => {
     const result = await Tesseract.recognize(image, "eng", {
         logger: (m) => console.log(m)
     })
