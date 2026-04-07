@@ -11,8 +11,11 @@ import {authMiddleware} from "./middlewares/auth.middleware.js"
 
 const app = express()
 
+
+app.set("trust proxy", 1)
+
 app.use(cors({
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-internal-key"],
     methods: ["GET", "POST",],
     origin: "*"
 }))
@@ -27,7 +30,9 @@ app.use(rateLimit({
     },
     headers: {
         "Content-Type": "application/json",
-        "Retry-After": "15"
+        "Retry-After": "15",
+        "x-internal-key": env.internalKey,
+        "Access-Control-Allow-Origin": "*"
     }
     },
     statusCode: 429,
