@@ -4,7 +4,7 @@ import ocrRouter from "./ocr.router.js";
 
 const router = Router()
 
-
+//* healh check route
 router.get("/health-check", (req: Request,res: Response) => {
     res.status(200).json({
         message: "Server is running",
@@ -12,6 +12,7 @@ router.get("/health-check", (req: Request,res: Response) => {
     })
 })
 
+//* ocr route
 router.use("ocr", ocrRouter)
 
 
