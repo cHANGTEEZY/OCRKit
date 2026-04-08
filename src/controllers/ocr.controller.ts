@@ -10,7 +10,6 @@ import { extractTextFromImage } from "../services/ocr.service.js";
 import { UnsupportedDocumentVariantError } from "../schemas/documentRegistry.js";
 import { parseFormatOptions } from "../utils/parseFormatOptions.js";
 import multer from "multer";
-import { json } from "zod";
 
 type OcrRequest = Request & { file?: Express.Multer.File | undefined };
 
