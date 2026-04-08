@@ -22,8 +22,8 @@ Security and ops middleware include **Helmet**, **CORS**, **Morgan**, and **rate
 
 3. **Optional formatting** — If you ask for structured output, the service maps OCR text into a **typed object** plus **meta** (`missingFields`, `warnings`, `needsReview`, etc.).  
    - **Currently implemented in the document registry:** **`payment_receipt`** only, in two shapes:
-     - **`summary`** — `merchantName`, `totalAmount`, `receiptDate`, `currency` (required for strict review: `merchantName`, `totalAmount`, `receiptDate`).
-     - **`full`** — same fields plus `transactionId` and `lineItems` (array of `description` + `amount`); required keys include **`transactionId`** in addition to the summary required fields.
+     - **`summary`** — `title` (e.g. restaurant or theater name) and `items`: `[{ itemName, price }, ...]`. Strict mode treats **`title`** as required when present in schema.
+     - **`full`** — same `title` + `items`, plus optional `totalAmount`, `receiptDate`, `currency`, `transactionId`. Strict mode still marks **`title`** as the primary required field.
    - The API allows `documentType` values `payment_receipt | invoice | resume`, but **`invoice` and `resume` are not registered yet** — formatting those will return an unsupported variant error until schemas are added.
 
 4. **Low confidence** — If OCR confidence is below **0.5** and you did **not** request formatting, the API responds with an error. If you **did** request formatting, processing continues and warnings/meta may reflect the weak OCR signal.

@@ -10,6 +10,7 @@ import { extractTextFromImage } from "../services/ocr.service.js";
 import { UnsupportedDocumentVariantError } from "../schemas/documentRegistry.js";
 import { parseFormatOptions } from "../utils/parseFormatOptions.js";
 import multer from "multer";
+import { json } from "zod";
 
 type OcrRequest = Request & { file?: Express.Multer.File | undefined };
 
@@ -145,6 +146,8 @@ export const ocrRouteController = async (
         throw err;
       }
     }
+
+    console.log("Data", JSON.stringify(data, null, Infinity));
 
     return res.status(200).json({
       message: "Text extracted successfully",

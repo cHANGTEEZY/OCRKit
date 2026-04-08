@@ -4,6 +4,7 @@ import { getAllowedTopLevelKeys, getSchemaEntry } from "../schemas/documentRegis
 import type { DocumentType, ResponseProfile } from "../schemas/document.enums.js";
 import type { StructuredMeta } from "../schemas/formattedMeta.schema.js";
 import { parseJsonObject } from "../utils/jsonExtract.js";
+import { heuristicPaymentReceiptFromText } from "../utils/paymentReceiptHeuristic.js";
 
 export type FormatDocumentInput = {
   rawText: string;
@@ -32,9 +33,9 @@ const LOW_CONFIDENCE_THRESHOLD = 0.5;
 
 const KEY_TYPES_HINT: Record<string, string> = {
   "payment_receipt:summary":
-    "merchantName: string|null, totalAmount: number|null, receiptDate: string|null (ISO yyyy-mm-dd if possible), currency: string|null (ISO 4217 if known)",
+    "title: string|null (restaurant, theater, merchant header), items: [{ itemName: string|null, price: number|null }] — one object per purchased line when visible",
   "payment_receipt:full":
-    "same as summary plus transactionId: string|null, lineItems: [{ description: string|null, amount: number|null }]",
+    "same title + items plus totalAmount: number|null, receiptDate: string|null (ISO yyyy-mm-dd if possible), currency: string|null (ISO 4217), transactionId: string|null",
 };
 
 function normalizeDeep(value: unknown): unknown {
@@ -92,7 +93,7 @@ function computeMissingRequiredFields(
 function buildStubData(allowedKeys: string[]): Record<string, unknown> {
   const o: Record<string, unknown> = {};
   for (const k of allowedKeys) {
-    o[k] = k === "lineItems" ? [] : null;
+    o[k] = k === "items" || k === "lineItems" ? [] : null;
   }
   return o;
 }
@@ -237,10 +238,21 @@ export async function formatDocumentSource(
   let rawData: Record<string, unknown>;
 
   if (mode === "stub") {
-    rawData = buildStubData(allowedKeys);
-    warnings.push(
-      "Formatter ran in stub mode (FORMATTER_MODE=stub); structured fields were not inferred from text.",
-    );
+    if (input.documentType === "payment_receipt") {
+      rawData = heuristicPaymentReceiptFromText(
+        input.rawText,
+        input.responseProfile,
+        allowedKeys,
+      );
+      warnings.push(
+        "Stub mode: payment_receipt uses built-in text heuristics; set FORMATTER_MODE=openai for LLM extraction.",
+      );
+    } else {
+      rawData = buildStubData(allowedKeys);
+      warnings.push(
+        "Formatter ran in stub mode (FORMATTER_MODE=stub); structured fields were not inferred from text.",
+      );
+    }
   } else {
     if (!env.openaiApiKey) {
       throw new FormatterError(

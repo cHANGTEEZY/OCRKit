@@ -12,43 +12,34 @@ const nullableMoney = z.preprocess((val) => {
   return null;
 }, z.number().nullable());
 
-/** payment_receipt / summary */
+const receiptLineItemSchema = z.object({
+  itemName: z.string().nullable(),
+  price: nullableMoney,
+});
+
+/** payment_receipt / summary — venue name + line items */
 export const paymentReceiptSummaryDataSchema = z.object({
-  merchantName: z.string().nullable(),
-  totalAmount: nullableMoney,
-  receiptDate: z.string().nullable(),
-  currency: z.string().nullable(),
+  title: z.string().nullable(),
+  items: z.array(receiptLineItemSchema).default([]),
 });
 
 export type PaymentReceiptSummaryData = z.infer<
   typeof paymentReceiptSummaryDataSchema
 >;
 
-/** payment_receipt / full */
+/** payment_receipt / full — same core plus optional receipt metadata */
 export const paymentReceiptFullDataSchema =
   paymentReceiptSummaryDataSchema.extend({
+    totalAmount: nullableMoney,
+    receiptDate: z.string().nullable(),
+    currency: z.string().nullable(),
     transactionId: z.string().nullable(),
-    lineItems: z
-      .array(
-        z.object({
-          description: z.string().nullable(),
-          amount: nullableMoney,
-        }),
-      )
-      .default([]),
   });
 
 export type PaymentReceiptFullData = z.infer<
   typeof paymentReceiptFullDataSchema
 >;
 
-export const paymentReceiptSummaryRequiredKeys = [
-  "merchantName",
-  "totalAmount",
-  "receiptDate",
-] as const;
+export const paymentReceiptSummaryRequiredKeys = ["title"] as const;
 
-export const paymentReceiptFullRequiredKeys = [
-  ...paymentReceiptSummaryRequiredKeys,
-  "transactionId",
-] as const;
+export const paymentReceiptFullRequiredKeys = ["title"] as const;
