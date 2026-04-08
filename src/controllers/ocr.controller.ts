@@ -1,4 +1,4 @@
-import type { NextFunction, Request, Response } from "express";
+import type { NextFunction, Request, RequestHandler, Response } from "express";
 import { env } from "../config/env.js";
 import { httpError } from "../middlewares/error.middleware.js";
 import {
@@ -9,13 +9,46 @@ import {
 import { extractTextFromImage } from "../services/ocr.service.js";
 import { UnsupportedDocumentVariantError } from "../schemas/documentRegistry.js";
 import { parseFormatOptions } from "../utils/parseFormatOptions.js";
+import multer from "multer";
 
 type OcrRequest = Request & { file?: Express.Multer.File | undefined };
 
-export const ocrController = async (
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 40 * 1024 * 1024 },
+});
+
+export const parseUpload: RequestHandler = (
   req: OcrRequest,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
+) => {
+  upload.single("image")(req, res, (err: any) => {
+    if (!err) {
+      return next();
+    }
+    if (err instanceof multer.MulterError) {
+      if (err.code === "LIMIT_FILE_SIZE") {
+        return next(
+          httpError(413, "Image exceeds 40MB limit", "LIMIT_FILE_SIZE", {
+            multerCode: err.code,
+          }),
+        );
+      }
+      return next(
+        httpError(400, err.message, err.code, { multerCode: err.code }),
+      );
+    }
+    return next(
+      httpError(400, (err as Error).message || "Upload failed", "UPLOAD_ERROR"),
+    );
+  });
+};
+
+export const ocrRouteController = async (
+  req: OcrRequest,
+  res: Response,
+  next: NextFunction,
 ) => {
   try {
     const body = req.body as Record<string, unknown> | undefined;
@@ -46,7 +79,7 @@ export const ocrController = async (
         ? "json"
         : "none";
     console.log(
-      `[OCR /parse] payload content-length=${contentLengthHeader ?? "n/a"} bytes, imagePayload=${imagePayloadBytes} bytes, source=${payloadSource}`
+      `[OCR /parse] payload content-length=${contentLengthHeader ?? "n/a"} bytes, imagePayload=${imagePayloadBytes} bytes, source=${payloadSource}`,
     );
 
     if (!image || (Buffer.isBuffer(image) && image.length === 0)) {
@@ -79,11 +112,11 @@ export const ocrController = async (
     if (formatOpts.value.wantsFormat && formatOpts.value.documentType) {
       try {
         const fmtInput: FormatDocumentInput = {
-            rawText: result.text,
-            documentType: formatOpts.value.documentType,
-            responseProfile: formatOpts.value.responseProfile,
-            strictMode: formatOpts.value.strictMode,
-          };
+          rawText: result.text,
+          documentType: formatOpts.value.documentType,
+          responseProfile: formatOpts.value.responseProfile,
+          strictMode: formatOpts.value.strictMode,
+        };
         if (result.confidence !== undefined) {
           fmtInput.confidence = result.confidence;
         }
