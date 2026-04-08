@@ -1,7 +1,14 @@
 import type { NextFunction, Request, Response } from "express";
 import { env } from "../config/env.js";
 import { httpError } from "../middlewares/error.middleware.js";
+import {
+  FormatterError,
+  formatDocumentSource,
+  type FormatDocumentInput,
+} from "../services/formatter.service.js";
 import { extractTextFromImage } from "../services/ocr.service.js";
+import { UnsupportedDocumentVariantError } from "../schemas/documentRegistry.js";
+import { parseFormatOptions } from "../utils/parseFormatOptions.js";
 
 type OcrRequest = Request & { file?: Express.Multer.File | undefined };
 
@@ -11,7 +18,16 @@ export const ocrController = async (
   next: NextFunction
 ) => {
   try {
-    const body = req.body as { image?: string } | undefined;
+    const body = req.body as Record<string, unknown> | undefined;
+    const formatOpts = parseFormatOptions(body);
+    if (!formatOpts.ok) {
+      return res.status(400).json({
+        message: formatOpts.message,
+        status: "error",
+        code: formatOpts.code,
+      });
+    }
+
     const imageFromBody = body?.image;
     const image =
       req.file?.buffer ??
@@ -44,7 +60,9 @@ export const ocrController = async (
 
     const result = await extractTextFromImage(image);
 
-    if (result.confidence && result.confidence < 0.5) {
+    const lowConfidence =
+      result.confidence !== undefined && result.confidence < 0.5;
+    if (lowConfidence && !formatOpts.value.wantsFormat) {
       return res.status(400).json({
         message: "Failed to extract text from image",
         status: "error",
@@ -52,10 +70,53 @@ export const ocrController = async (
       });
     }
 
+    type OcrData = typeof result & {
+      formatted?: { data: Record<string, unknown>; meta: unknown };
+    };
+
+    const data: OcrData = { ...result };
+
+    if (formatOpts.value.wantsFormat && formatOpts.value.documentType) {
+      try {
+        const fmtInput: FormatDocumentInput = {
+            rawText: result.text,
+            documentType: formatOpts.value.documentType,
+            responseProfile: formatOpts.value.responseProfile,
+            strictMode: formatOpts.value.strictMode,
+          };
+        if (result.confidence !== undefined) {
+          fmtInput.confidence = result.confidence;
+        }
+        const cfs = formatOpts.value.clientRequestedFields;
+        if (cfs !== undefined) {
+          fmtInput.clientRequestedFields = cfs;
+        }
+        const formatted = await formatDocumentSource(fmtInput);
+        data.formatted = formatted;
+      } catch (err) {
+        if (err instanceof UnsupportedDocumentVariantError) {
+          return res.status(400).json({
+            message: err.message,
+            status: "error",
+            code: err.code,
+          });
+        }
+        if (err instanceof FormatterError) {
+          const status = err.code === "FORMATTER_CONFIG" ? 500 : 422;
+          return res.status(status).json({
+            message: err.message,
+            status: "error",
+            code: err.code,
+          });
+        }
+        throw err;
+      }
+    }
+
     return res.status(200).json({
       message: "Text extracted successfully",
       status: "success",
-      data: result,
+      data,
     });
   } catch (error) {
     const message =
