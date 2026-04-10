@@ -14,4 +14,5 @@ export const env = {
   formatterMode,
   openaiApiKey: process.env.OPENAI_API_KEY ?? "",
   openaiModel: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
+  lowConfidenceThreshold: process.env.LOW_CONFIDENCE_THRESHOLD ?? 0.5,
 };

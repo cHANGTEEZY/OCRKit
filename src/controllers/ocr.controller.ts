@@ -94,7 +94,8 @@ export const ocrRouteController = async (
     const result = await extractTextFromImage(image);
 
     const lowConfidence =
-      result.confidence !== undefined && result.confidence < 0.5;
+      result.confidence !== undefined &&
+      result.confidence < Number(env.lowConfidenceThreshold);
     if (lowConfidence && !formatOpts.value.wantsFormat) {
       return res.status(400).json({
         message: "Failed to extract text from image",
